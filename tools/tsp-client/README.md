@@ -5,7 +5,7 @@ A simple command line tool to facilitate generating client libraries from TypeSp
 ## Installation
 
 ```
-npm install @azure-tools/typespec-client-generator-cli
+npm install -g @azure-tools/typespec-client-generator-cli
 ```
 
 ## Prerequisites
@@ -52,7 +52,7 @@ Generate a client library from a TypeSpec project. The `generate` command should
 
 ### convert
 
-Convert an existing swagger specification to a TypeSpec project. This command should only be run once to get started working on a TypeSpec project. TypeSpec projects will need to be optimized manually and fully reviewed after conversion. When using this command a path or url to a swagger README file is required through the `--swagger-readme` flag.
+Convert an existing swagger specification to a TypeSpec project. This command should only be run once to get started working on a TypeSpec project. TypeSpec projects will need to be optimized manually and fully reviewed after conversion. When using this command a path or url to a swagger README file is required through the `--swagger-readme` flag. By default, the converted TypeSpec project will leverage TypeSpec built-in libraries with standard patterns and templates (highly recommended), which will cause discrepancies between the generated TypeSpec and original swagger. If you really don't want this intended discrepancy, add `--fully-compatible` flag to generate a TypeSpec project that is fully compatible with the swagger.
 
 ### compare
 
@@ -62,6 +62,10 @@ correspond to differences in the service, allowing you to focus only on differen
 ### sort-swagger
 
 Sort an existing swagger specification to be the same content order with TypeSpec generated swagger. This will allow you to easily compare and identify differences between the existing swagger and TypeSpec generated one. You should run this command on existing swagger files and check them in prior to creating converted TypeSpec PRs.
+
+### generate-config-files
+
+Generate the `emitter-package.json` and `emitter-package-lock.json` used for tsp-client commands under the eng/ directory of your current repository. Run this command from the target repository and pass in the path to the package.json file of the emitter you want to use generate the configuration files.
 
 ### generate-lock-file
 
@@ -124,6 +128,7 @@ The file has the following properties:
 | <a id="additionalDirectories-anchor"></a> additionalDirectories | Sometimes a typespec file will use a relative import that might not be under the main directory. In this case a single `directory` will not be enough to pull down all necessary files. To support this you can specify additional directories as a list to sync so that all needed files are synced. | false: default = null |
 | <a id="commit-anchor"></a> commit                               | The commit sha for the version of the typespec files you want to generate off of. This allows us to have idempotence on generation until we opt into pointing at a later version.                                                                                                                     | true                  |
 | <a id="repo-anchor"></a> repo                                   | The repo this spec lives in. This should be either `Azure/azure-rest-api-specs` or `Azure/azure-rest-api-specs-pr`. Note that pr will work locally but not in CI until we add another change to handle token based auth.                                                                              | true                  |
+| <a id="repo-anchor"></a> entrypointFile                         | A specific entrypoint file used to compile the TypeSpec project. NOTE: This option should only be used with a non-standard entrypoint file name. DO NOT use this option with standard entrypoints: `client.tsp` or `main.tsp`.                                                                        | false                 |
 
 Example:
 
