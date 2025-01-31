@@ -21,7 +21,7 @@ namespace APIViewWeb
 
         public override string Name { get; } = "TypeSpec";
         public override string [] Extensions { get; } = { ".tsp", ".cadl" };
-        public override string VersionString { get; } = "0";
+        public override string VersionString { get; } = "0.5.0";
         public override string ProcessName => throw new NotImplementedException();
 
         public TypeSpecLanguageService(IConfiguration configuration, TelemetryClient telemetryClient) : base(telemetryClient)
@@ -40,6 +40,11 @@ namespace APIViewWeb
             throw new NotImplementedException();
         }
         public override bool CanUpdate(string versionString)
+        {
+            return false;
+        }
+
+        public override bool CanConvert(string versionString)
         {
             return false;
         }
