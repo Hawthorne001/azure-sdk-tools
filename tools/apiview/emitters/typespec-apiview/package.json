@@ -74,7 +74,7 @@
     "prettier": "~3.2.5",
     "rimraf": "~5.0.7",
     "typescript": "~5.4.5",
-    "mocha": "~9.2.0",
+    "mocha": "~11.1.0",
     "mocha-junit-reporter": "~2.0.2",
     "mocha-multi-reporters": "~1.5.1",
     "source-map-support": "^0.5.19"
