@@ -13,6 +13,10 @@ import { DropdownModule } from 'primeng/dropdown';
 import { MenubarModule } from 'primeng/menubar';
 import { MultiSelectModule } from 'primeng/multiselect';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { IconFieldModule } from 'primeng/iconfield';
+import { InputIconModule } from 'primeng/inputicon';
+import { InputGroupModule } from 'primeng/inputgroup';
+import { InputGroupAddonModule } from 'primeng/inputgroupaddon';
 import { SplitterModule } from 'primeng/splitter';
 import { SidebarModule } from 'primeng/sidebar';
 import { TimeagoModule } from 'ngx-timeago';
@@ -21,6 +25,13 @@ import { FileUploadModule } from 'primeng/fileupload';
 import { InputTextModule } from 'primeng/inputtext';
 import { MessagesModule } from 'primeng/messages';
 import { BadgeModule } from 'primeng/badge';
+import { SimplemdeModule } from 'ngx-simplemde';
+import { MonacoEditorModule, NgxMonacoEditorConfig  } from 'ngx-monaco-editor-v2';
+import { environment } from 'src/environments/environment';
+
+const monacoEditorConfig: NgxMonacoEditorConfig = {
+  baseUrl: environment.assetsPath 
+};
  
 
 @NgModule({
@@ -48,6 +59,8 @@ import { BadgeModule } from 'primeng/badge';
     MessagesModule,
     MultiSelectModule,
     FormsModule,
+    IconFieldModule,
+    InputIconModule,
     FileUploadModule,
     ReactiveFormsModule,
     SelectButtonModule,
@@ -55,6 +68,8 @@ import { BadgeModule } from 'primeng/badge';
     SidebarModule,
     TimeagoModule,
     InputTextModule,
+    SimplemdeModule,
+    MonacoEditorModule
   ],
   imports: [
     CommonModule,
@@ -67,6 +82,8 @@ import { BadgeModule } from 'primeng/badge';
     MessagesModule,
     MultiSelectModule,
     FormsModule,
+    IconFieldModule,
+    InputIconModule,
     FileUploadModule,
     ReactiveFormsModule,
     SelectButtonModule,
@@ -74,6 +91,8 @@ import { BadgeModule } from 'primeng/badge';
     SidebarModule,
     InputTextModule,
     TimeagoModule.forRoot(),
+    SimplemdeModule.forRoot(),
+    MonacoEditorModule.forRoot(monacoEditorConfig)
   ]
 })
 export class SharedAppModule { }

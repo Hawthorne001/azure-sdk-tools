@@ -7,11 +7,10 @@ import { modifyOrGenerateCiYml } from "../../utils/changeCiYaml";
 import { changeConfigOfTestAndSample, ChangeModel, SdkType } from "../../utils/changeConfigOfTestAndSample";
 import { changeRushJson } from "../../utils/changeRushJson";
 import { getOutputPackageInfo } from "../../utils/getOutputPackageInfo";
-import { getChangedCiYmlFilesInSpecificFolder, getChangedPackageDirectory } from "../../utils/git";
+import { getChangedCiYmlFilesInSpecificFolder } from "../../utils/git";
 import { logger } from "../../utils/logger";
 import { RunningEnvironment } from "../../utils/runningEnvironment";
 import { prepareCommandToInstallDependenciesForTypeSpecProject } from '../utils/prepareCommandToInstallDependenciesForTypeSpecProject';
-import { generateChangelog } from "../utils/generateChangelog";
 import {
     generateAutorestConfigurationFileForMultiClientByPrComment,
     generateAutorestConfigurationFileForSingleClientByPrComment, replaceRequireInAutorestConfigurationFile
@@ -20,6 +19,9 @@ import { updateTypeSpecProjectYamlFile } from '../utils/updateTypeSpecProjectYam
 import { getRelativePackagePath } from "../utils/utils";
 import { defaultChildProcessTimeout, getGeneratedPackageDirectory } from "../../common/utils";
 import { remove } from 'fs-extra';
+import { generateChangelogAndBumpVersion } from "../../common/changlog/automaticGenerateChangeLogAndBumpVersion";
+import { updateChangelogResult } from "../../common/packageResultUtils";
+import { migratePackage } from "../../common/migration";
 
 export async function generateRLCInPipeline(options: {
     sdkRepo: string;
@@ -75,7 +77,9 @@ export async function generateRLCInPipeline(options: {
                 logger.info(`Start to run command: '${scriptCommand}'`);
                 execSync(scriptCommand, {stdio: 'inherit'});
                 logger.info("Generated code by tsp-client successfully.");
-            } 
+            }
+            packagePath = generatedPackageDir;
+            relativePackagePath = path.relative(options.sdkRepo, packagePath);
         }
     } else {
         logger.info(`Start to generate SDK from '${options.readmeMd}'.`);
@@ -192,19 +196,6 @@ export async function generateRLCInPipeline(options: {
     const outputPackageInfo = getOutputPackageInfo(options.runningEnvironment, options.readmeMd, options.typespecProject);
 
     try {
-        // TODO: need to refactor
-        // too tricky here, when relativePackagePath === undefined,
-        // the project should be typespec,
-        // and the changedPackageDirectories should be join(service-dir, package-dir)
-        if (!packagePath || !relativePackagePath) {
-            const changedPackageDirectories: Set<string> = await getChangedPackageDirectory(!options.skipGeneration);
-            if (changedPackageDirectories.size !== 1) {
-                throw new Error(`Find unexpected changed package directory. Length: ${changedPackageDirectories.size}. Value: ${[...changedPackageDirectories].join(', ')}. Please only change files in one directory`)
-            }
-            for (const d of changedPackageDirectories) relativePackagePath = d;
-            packagePath = path.join(options.sdkRepo, relativePackagePath!);
-        }
-
         if (!packagePath || !relativePackagePath) {
             throw new Error(`Failed to get package path`);
         }
@@ -236,14 +227,19 @@ export async function generateRLCInPipeline(options: {
 
         logger.info(`Start to update rush.`);
         execSync('node common/scripts/install-run-rush.js update', {stdio: 'inherit'});
+        
+        await migratePackage(packagePath);
+        
         logger.info(`Start to build '${packageName}', except for tests and samples, which may be written manually.`);
         // To build generated codes except test and sample, we need to change tsconfig.json.
         execSync(`node common/scripts/install-run-rush.js build -t ${packageName} --verbose`, {stdio: 'inherit'});
         logger.info(`Start to run command 'node common/scripts/install-run-rush.js pack --to ${packageName} --verbose'.`);
         execSync(`node common/scripts/install-run-rush.js pack --to ${packageName} --verbose`, {stdio: 'inherit'});
         if (!options.skipGeneration) {
-            logger.info(`Start to generate changelog.`);
-            await generateChangelog(packagePath);
+            const changelog = await generateChangelogAndBumpVersion(relativePackagePath);
+            outputPackageInfo.changelog.breakingChangeItems = changelog?.getBreakingChangeItems() ?? [];
+            outputPackageInfo.changelog.content = changelog?.displayChangeLog() ?? '';
+            outputPackageInfo.changelog.hasBreakingChange = changelog?.hasBreakingChange ?? false;
         }
         if (options.outputJson && options.runningEnvironment !== undefined && outputPackageInfo !== undefined) {
             for (const file of fs.readdirSync(packagePath)) {

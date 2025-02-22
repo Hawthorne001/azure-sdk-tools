@@ -5,6 +5,7 @@ import {
   compareCommand,
   convertCommand,
   generateCommand,
+  generateConfigFilesCommand,
   generateLockFileCommand,
   initCommand,
   sortSwaggerCommand,
@@ -199,11 +200,35 @@ const parser = yargs(hideBin(process.argv))
         .option("arm", {
           type: "boolean",
           description: "Convert swagger to ARM TypeSpec",
+        })
+        .option("fully-compatible", {
+          type: "boolean",
+          description: "Convert swagger to fully compatible TypeSpec",
         });
     },
     async (argv: any) => {
       argv["output-dir"] = resolveOutputDir(argv);
       await convertCommand(argv);
+    },
+  )
+  .command(
+    "generate-config-files",
+    "Generate emitter-package.json and emitter-package-lock.json files from a TypeSpec emitter's package.json",
+    (yargs: any) => {
+      return yargs
+        .option("package-json", {
+          type: "string",
+          description: "Path to the emitter's package.json file",
+          demandOption: true,
+        })
+        .option("overrides", {
+          type: "string",
+          description: "Path to an override config file for pinning specific dependencies",
+        });
+    },
+    async (argv: any) => {
+      argv["output-dir"] = resolveOutputDir(argv);
+      await generateConfigFilesCommand(argv);
     },
   )
   .command(
