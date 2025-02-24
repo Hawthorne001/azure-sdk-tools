@@ -9,7 +9,12 @@ import {
 } from "./fs.js";
 import { cp, mkdir, readFile, stat, unlink, writeFile } from "fs/promises";
 import { npmCommand, nodeCommand } from "./npm.js";
-import { compileTsp, discoverMainFile, resolveTspConfigUrl, TspLocation } from "./typespec.js";
+import {
+  compileTsp,
+  discoverEntrypointFile,
+  resolveTspConfigUrl,
+  TspLocation,
+} from "./typespec.js";
 import {
   writeTspLocationYaml,
   getAdditionalDirectoryName,
@@ -27,8 +32,8 @@ export async function initCommand(argv: any) {
   let outputDir = argv["output-dir"];
   let tspConfig = argv["tsp-config"];
   const skipSyncAndGenerate = argv["skip-sync-and-generate"];
-  const commit = argv["commit"];
-  const repo = argv["repo"];
+  const commit = argv["commit"] ?? "<replace with your value>";
+  const repo = argv["repo"] ?? "<replace with your value>";
 
   const repoRoot = await getRepoRoot(outputDir);
 
@@ -40,16 +45,16 @@ export async function initCommand(argv: any) {
   }
 
   let isUrl = true;
-  if (await doesFileExist(tspConfig)) {
+  if (argv["local-spec-repo"]) {
+    const localSpecRepo = argv["local-spec-repo"];
+    if (!(await doesFileExist(localSpecRepo))) {
+      throw new Error(`Local spec repo not found: ${localSpecRepo}`);
+    }
+    isUrl = false;
+    tspConfig = localSpecRepo;
+  } else if (await doesFileExist(tspConfig)) {
     isUrl = false;
   }
-  if (!isUrl) {
-    if (!commit || !repo) {
-      Logger.error("--commit and --repo are required when --tsp-config is a local directory");
-      process.exit(1);
-    }
-  }
-
   if (isUrl) {
     // URL scenario
     const resolvedConfigUrl = resolveTspConfigUrl(tspConfig);
@@ -136,6 +141,10 @@ export async function initCommand(argv: any) {
   if (!skipSyncAndGenerate) {
     // update argv in case anything changed and call into sync and generate
     argv["output-dir"] = outputDir;
+    if (!isUrl) {
+      // If the local spec repo is provided, we need to update the local-spec-repo argument for syncing as well
+      argv["local-spec-repo"] = tspConfig;
+    }
     await syncCommand(argv);
     await generateCommand(argv);
   }
@@ -144,7 +153,7 @@ export async function initCommand(argv: any) {
 
 export async function syncCommand(argv: any) {
   let outputDir = argv["output-dir"];
-  const localSpecRepo = argv["local-spec-repo"];
+  let localSpecRepo = argv["local-spec-repo"];
 
   const tempRoot = await createTempDirectory(outputDir);
   const repoRoot = await getRepoRoot(outputDir);
@@ -163,6 +172,10 @@ export async function syncCommand(argv: any) {
   await mkdir(srcDir, { recursive: true });
 
   if (localSpecRepo) {
+    if (localSpecRepo.endsWith("tspconfig.yaml")) {
+      // If the path is to tspconfig.yaml, we need to remove it to get the spec directory
+      localSpecRepo = localSpecRepo.split("tspconfig.yaml")[0];
+    }
     Logger.info(
       "NOTE: A path to a local spec was provided, will generate based off of local files...",
     );
@@ -249,7 +262,7 @@ export async function generateCommand(argv: any) {
   if (!emitter) {
     throw new Error("emitter is undefined");
   }
-  const mainFilePath = await discoverMainFile(srcDir);
+  const mainFilePath = await discoverEntrypointFile(srcDir, tspLocation.entrypointFile);
   const resolvedMainFilePath = joinPaths(srcDir, mainFilePath);
   Logger.info("Installing dependencies from npm...");
   const args: string[] = [];
@@ -268,13 +281,20 @@ export async function generateCommand(argv: any) {
     args.push("--force");
   }
   await npmCommand(srcDir, args);
-  const success = await compileTsp({
+
+  const [success, exampleCmd] = await compileTsp({
     emitterPackage: emitter,
     outputPath: outputDir,
     resolvedMainFilePath,
     saveInputs: saveInputs,
     additionalEmitterOptions: emitterOptions,
   });
+
+  if (argv["debug"]) {
+    Logger.warn(`Example of how to compile using the tsp commandline. NOTE: tsp-client does NOT directly run this command, results may vary:
+        ${exampleCmd}
+        `);
+  }
 
   if (saveInputs) {
     Logger.debug(`Skipping cleanup of temp directory: ${tempRoot}`);
@@ -333,6 +353,8 @@ export async function convertCommand(argv: any): Promise<void> {
   const outputDir = argv["output-dir"];
   const swaggerReadme = argv["swagger-readme"];
   const arm = argv["arm"];
+  const fullyCompatible = argv["fully-compatible"];
+  const debug = argv["debug"];
   let rootUrl = resolvePath(outputDir);
 
   Logger.info("Converting swagger to typespec...");
@@ -368,6 +390,14 @@ export async function convertCommand(argv: any): Promise<void> {
   if (arm) {
     args.push("--isArm");
   }
+
+  if (fullyCompatible) {
+    args.push("--isFullCompatible");
+  }
+
+  if (debug) {
+    args.push("--debug");
+  }
   await nodeCommand(outputDir, args);
 
   if (arm) {
@@ -378,6 +408,61 @@ export async function convertCommand(argv: any): Promise<void> {
       process.exit(1);
     }
   }
+}
+
+export async function generateConfigFilesCommand(argv: any) {
+  const outputDir = argv["output-dir"];
+  const repoRoot = await getRepoRoot(outputDir);
+  const packageJsonPath = normalizePath(resolve(argv["package-json"]));
+  const overridePath = argv["overrides"] ?? undefined;
+
+  if (packageJsonPath === undefined || !(await doesFileExist(packageJsonPath))) {
+    throw new Error(`package.json not found in: ${packageJsonPath ?? "[Not Specified]"}`);
+  }
+  Logger.info("Generating emitter-package.json file...");
+  const content = await readFile(packageJsonPath);
+  const packageJson: Record<string, any> = JSON.parse(content.toString());
+  const emitterPackageJson: Record<string, any> = {
+    name: "dist/src/index.js",
+    dependencies: {},
+  };
+
+  let overrideJson: Record<string, any> = {};
+  if (overridePath) {
+    overrideJson = JSON.parse((await readFile(overridePath)).toString()) ?? {};
+  }
+
+  // Add emitter as dependency
+  emitterPackageJson["dependencies"][packageJson["name"]] =
+    overrideJson[packageJson["name"]] ?? packageJson["version"];
+
+  delete overrideJson[packageJson["name"]];
+  const devDependencies: Record<string, any> = {};
+  const peerDependencies = packageJson["peerDependencies"] ?? {};
+  const possiblyPinnedPackages: Array<string> =
+    packageJson["azure-sdk/emitter-package-json-pinning"] ?? Object.keys(peerDependencies);
+
+  for (const pinnedPackage of possiblyPinnedPackages) {
+    const pinnedVersion = packageJson["devDependencies"][pinnedPackage];
+    if (pinnedVersion && !overrideJson[pinnedPackage]) {
+      Logger.info(`Pinning ${pinnedPackage} to ${pinnedVersion}`);
+      devDependencies[pinnedPackage] = pinnedVersion;
+    }
+  }
+
+  if (Object.keys(devDependencies).length > 0) {
+    emitterPackageJson["devDependencies"] = devDependencies;
+  }
+  if (Object.keys(overrideJson).length > 0) {
+    emitterPackageJson["overrides"] = overrideJson;
+  }
+  await writeFile(
+    joinPaths(repoRoot, "eng", "emitter-package.json"),
+    JSON.stringify(emitterPackageJson, null, 2),
+  );
+  Logger.info(`emitter-package.json file generated in '${joinPaths(repoRoot, "eng")}' directory`);
+
+  await generateLockFileCommand(argv);
 }
 
 export async function generateLockFileCommand(argv: any) {
