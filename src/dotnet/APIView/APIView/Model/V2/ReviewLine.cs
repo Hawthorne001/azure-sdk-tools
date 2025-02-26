@@ -104,10 +104,13 @@ namespace APIView.Model.V2
                 return string.Empty;
             }
             StringBuilder sb = new();
+            bool spaceAdded = false;
             foreach (var token in filterdTokens)
             {
+                sb.Append(token.HasPrefixSpace == true && !spaceAdded ? " " : string.Empty);
                 sb.Append(token.Value);
                 sb.Append(token.HasSuffixSpace == true ? " " : string.Empty);
+                spaceAdded = token.HasSuffixSpace == true;
             }
             return sb.ToString();
         }
@@ -150,5 +153,11 @@ namespace APIView.Model.V2
             int hash = inputString.GetHashCode();
             return "nId" + hash.ToString();
         }
+
+        public bool IsSkippedFromDiff()
+        {
+            return Tokens.All(t => t.SkipDiff == true);
+        }
+
     }
 }

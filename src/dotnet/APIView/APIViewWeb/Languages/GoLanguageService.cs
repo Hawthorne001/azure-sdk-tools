@@ -18,7 +18,7 @@ namespace APIViewWeb
         public override string Name { get; } = "Go";
         public override string [] Extensions { get; } = { ".gosource" };
         public override string ProcessName { get; } = "apiviewgo";
-        public override string VersionString { get; } = "2";
+        public override string VersionString { get; } = "0.1";
 
         public GoLanguageService(TelemetryClient telemetryClient) : base(telemetryClient)
         {
@@ -69,7 +69,7 @@ namespace APIViewWeb
 
                 using (var codeFileStream = File.OpenRead(jsonFilePath))
                 {
-                    var codeFile = await CodeFile.DeserializeAsync(codeFileStream, doTreeStyleParserDeserialization: LanguageServiceHelpers.UseTreeStyleParser(this.Name));
+                    var codeFile = await CodeFile.DeserializeAsync(codeFileStream);
                     codeFile.VersionString = VersionString;
                     codeFile.Language = Name;
                     return codeFile;

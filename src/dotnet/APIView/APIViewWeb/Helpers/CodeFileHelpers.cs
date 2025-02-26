@@ -7,7 +7,6 @@ using APIViewWeb.Extensions;
 using APIViewWeb.LeanModels;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -57,7 +56,7 @@ namespace APIViewWeb.Helpers
             foreach (var reviewLine in reviewLines)
             {
                 if (reviewLine.IsDocumentation) continue;
-                nodeHashId = await BuildAPITree(codePanelData: codePanelData, codePanelRawData: codePanelRawData, reviewLine: reviewLines[idx],
+                nodeHashId = await BuildAPITree(codePanelData: codePanelData, codePanelRawData: codePanelRawData, reviewLine: reviewLine,
                     parentNodeIdHashed: rootNodeId, nodePositionAtLevel: idx, prevNodeHashId: nodeHashId, relatedLineMap: relatedLineMap);
                 idx++;
             }
@@ -117,13 +116,25 @@ namespace APIViewWeb.Helpers
             {
                 //Set current line as bottom token if it is end of context line.
                 codePanelData.NodeMetaDataObj[prevNodeHashId].BottomTokenNodeIdHash = nodeIdHashed;
+                codePanelData.NodeMetaDataObj[nodeIdHashed].RelatedNodeIdHash = prevNodeHashId;
+                if (reviewLine.DiffKind != DiffKind.NoneDiff)
+                {
+                    codePanelData.NodeMetaDataObj[prevNodeHashId].IsNodeWithDiffInDescendants = true;
+                    codePanelData.NodeMetaDataObj[prevNodeHashId].IsNodeWithNoneDocDiffInDescendants = true;
+                }
                 //Copy added removed classes from parent node to bottom node.
                 var classes = codePanelData.NodeMetaDataObj[prevNodeHashId].CodeLinesObj.LastOrDefault()?.RowClassesObj;
-                if (classes != null)
+                if (classes != null && reviewLine.DiffKind == DiffKind.NoneDiff)
                 {
                     classes = classes.Where(c => c == "added" || c == "removed").ToHashSet();
                     codePanelData.NodeMetaDataObj[nodeIdHashed].CodeLinesObj.LastOrDefault()?.RowClassesObj.UnionWith(classes);
                 }
+            }
+
+            //Set previous node as related if current line is empty and if parser didn't set a related line ID for empty line.
+            if (reviewLine.Tokens.Count == 0 && string.IsNullOrEmpty(reviewLine.RelatedToLine))
+            {
+                codePanelData.NodeMetaDataObj[nodeIdHashed].RelatedNodeIdHash = prevNodeHashId;
             }
 
             return nodeIdHashed;
@@ -250,9 +261,16 @@ namespace APIViewWeb.Helpers
                 }
             }
 
+            bool spaceAdded = false;
             // Convert ReviewToken to UI required StructuredToken
             foreach (var token in reviewLine.Tokens)
             {
+                if (token.HasPrefixSpace == true && !spaceAdded)
+                {
+                    var spaceToken = StructuredToken.CreateSpaceToken();
+                    spaceToken.Value = " ";
+                    tokensInRow.Add(spaceToken);
+                }
                 var structuredToken = new StructuredToken(token);
                 tokensInRow.Add(structuredToken);
 
@@ -268,6 +286,11 @@ namespace APIViewWeb.Helpers
                     var spaceToken = StructuredToken.CreateSpaceToken();
                     spaceToken.Value = " ";
                     tokensInRow.Add(spaceToken);
+                    spaceAdded = true;
+                }
+                else
+                {
+                    spaceAdded = false;
                 }
             }
             return codePanelRowData;
@@ -364,8 +387,8 @@ namespace APIViewWeb.Helpers
 
         private static bool AreReviewLinesSame(List<ReviewLine> reviewLinesA, List<ReviewLine> reviewLinesB)
         {
-            var filteredLinesA = reviewLinesA.Where(x => x.Tokens.Count > 0 && !x.IsDocumentation).ToList();
-            var filteredLinesB = reviewLinesB.Where(x => x.Tokens.Count > 0 && !x.IsDocumentation).ToList();
+            var filteredLinesA = reviewLinesA.Where(x => x.Tokens.Count > 0 && !x.IsDocumentation && !x.IsSkippedFromDiff()).ToList();
+            var filteredLinesB = reviewLinesB.Where(x => x.Tokens.Count > 0 && !x.IsDocumentation && !x.IsSkippedFromDiff()).ToList();
 
             if (filteredLinesA.Count() != filteredLinesB.Count())
                 return false;
@@ -395,7 +418,7 @@ namespace APIViewWeb.Helpers
 
             foreach (var line in interleavedLines)
             {
-                if (line.IsDocumentation || line.Processed)
+                if (line.IsDocumentation || line.Processed || (!line.IsActiveRevisionLine && line.IsSkippedFromDiff()))
                     continue;
 
 
@@ -403,8 +426,11 @@ namespace APIViewWeb.Helpers
                 // If a node is diff then no need to check it's children as they will be marked as diff as well.
                 if (!intersectLines.Contains(line))
                 {
-                    //Recursively mark line as added or removed
-                    MarkTreeNodeAsModified(line, line.IsActiveRevisionLine ? DiffKind.Added : DiffKind.Removed);
+                    //Recursively mark line as added or removed if line is not skipped from diff
+                    if (!line.IsSkippedFromDiff())
+                    {
+                        MarkTreeNodeAsModified(line, line.IsActiveRevisionLine ? DiffKind.Added : DiffKind.Removed);
+                    }
 
                     //Check if diff revision has a line at same level with same Line Id. This is to handle where a API was removed and added back in different order.
                     // This will also ensure added and modified lines are visible next to each other in the review.
@@ -413,9 +439,12 @@ namespace APIViewWeb.Helpers
                     if (relatedLine != null)
                     {
                         relatedLine.Processed = true;
-                        MarkTreeNodeAsModified(relatedLine, relatedLine.IsActiveRevisionLine ? DiffKind.Added : DiffKind.Removed);
-                        //Identify the tokens within modified lines and highlight them in the UI
-                        FindModifiedTokens(line, relatedLine);
+                        if (!relatedLine.IsSkippedFromDiff())
+                        {
+                            MarkTreeNodeAsModified(relatedLine, relatedLine.IsActiveRevisionLine ? DiffKind.Added : DiffKind.Removed);
+                            //Identify the tokens within modified lines and highlight them in the UI
+                            FindModifiedTokens(line, relatedLine);
+                        }                        
                     }
 
                     if (relatedLine != null)

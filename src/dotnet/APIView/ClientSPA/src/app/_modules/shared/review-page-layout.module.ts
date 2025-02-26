@@ -5,7 +5,6 @@ import { CommentThreadComponent } from 'src/app/_components/shared/comment-threa
 import { ReviewPageLayoutComponent } from 'src/app/_components/shared/review-page-layout/review-page-layout.component';
 import { MarkdownToHtmlPipe } from 'src/app/_pipes/markdown-to-html.pipe';
 import { EditorComponent } from 'src/app/_components/shared/editor/editor.component';
-import { EditorModule } from 'primeng/editor';
 import { PanelModule } from 'primeng/panel';
 import { MenuModule } from 'primeng/menu';
 import { TimelineModule } from 'primeng/timeline';
@@ -14,7 +13,7 @@ import { RevisionOptionsComponent } from 'src/app/_components/revision-options/r
 import { SharedAppModule } from './shared-app.module';
 import { CommonModule } from '@angular/common'; 
 import { PageOptionsSectionComponent } from 'src/app/_components/shared/page-options-section/page-options-section.component';
-import { NavBarComponent } from 'src/app/_components/shared/nav-bar/nav-bar.component';
+import { HtmlToMarkdownPipe } from 'src/app/_pipes/html-to-markdown.pipe';
 
 @NgModule({
   declarations: [
@@ -25,6 +24,7 @@ import { NavBarComponent } from 'src/app/_components/shared/nav-bar/nav-bar.comp
     RevisionOptionsComponent,
     PageOptionsSectionComponent,
     MarkdownToHtmlPipe,
+    HtmlToMarkdownPipe,
     EditorComponent,
   ],
   exports: [
@@ -35,9 +35,9 @@ import { NavBarComponent } from 'src/app/_components/shared/nav-bar/nav-bar.comp
     ReviewPageLayoutComponent,
     RevisionOptionsComponent,
     MarkdownToHtmlPipe,
+    HtmlToMarkdownPipe,
     EditorComponent,
     SharedAppModule,
-    EditorModule,
     PanelModule,
     MenuModule,
     TimelineModule,
@@ -46,7 +46,6 @@ import { NavBarComponent } from 'src/app/_components/shared/nav-bar/nav-bar.comp
   imports: [
     CommonModule,
     SharedAppModule,
-    EditorModule,
     PanelModule,
     MenuModule,
     TimelineModule,

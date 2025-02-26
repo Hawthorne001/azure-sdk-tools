@@ -55,6 +55,8 @@ param (
   [Parameter()]
   [string] $AllowListPath = "$PSScriptRoot/cleanup-allowlist.txt",
 
+  [string] $GroupFilter = '*',
+
   [Parameter()]
   [switch] $Force,
 
@@ -342,6 +344,23 @@ function DeleteArmDeployments([object]$ResourceGroup) {
   $null = $toDelete | Remove-AzResourceGroupDeployment
 }
 
+function DeleteSubscriptionDeployments() {
+  $subDeployments = @(Get-AzSubscriptionDeployment)
+  if (!$subDeployments) {
+    return
+  }
+  Write-Host "Removing $($subDeployments.Count) subscription scoped deployments async"
+  $subDeployments | Remove-AzSubscriptionDeployment -AsJob | Out-Null
+  for ($i = 0; $i -lt 20; $i++) {
+      $notStarted = Get-Job | Where-Object { $_.State -eq 'NotStarted' }
+      if (!$notStarted) {
+          break
+      }
+      Write-Host "Waiting for async jobs to start..."
+      Start-Sleep 5
+  }
+}
+
 function DeleteOrUpdateResourceGroups() {
   [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
   param()
@@ -351,7 +370,11 @@ function DeleteOrUpdateResourceGroups() {
   }
 
   Write-Verbose "Fetching groups"
-  [Array]$allGroups = Retry { Get-AzResourceGroup }
+  [Array]$allGroups = Retry { Get-AzResourceGroup } | Where-Object { $_.ResourceGroupName -like $GroupFilter }
+  if (!$allGroups) {
+      Write-Warning "No resource groups found"
+      return
+  }
   $toDelete = @()
   $toClean = @()
   $toDeleteSoon = @()
@@ -401,7 +424,12 @@ function DeleteOrUpdateResourceGroups() {
   $hasError = DeleteAndPurgeGroups $toDelete
 
   foreach ($rg in $toClean) {
-    DeleteArmDeployments $rg
+    try {
+      DeleteArmDeployments $rg
+    } catch {
+      Write-Warning "Error deleting deployments for group '$($rg.ResourceGroupName)'"
+      Write-Warning $_
+    }
   }
 
   if ($hasError) {
@@ -437,9 +465,9 @@ function DeleteAndPurgeGroups([array]$toDelete) {
         if ($rg.Tags?.ContainsKey('ServiceDirectory') -and $rg.Tags.ServiceDirectory -like '*storage*') {
           SetStorageNetworkAccessRules -ResourceGroupName $rg.ResourceGroupName -SetFirewall -CI:($null -ne $env:SYSTEM_TEAMPROJECTID) 
           Remove-WormStorageAccounts -GroupPrefix $rg.ResourceGroupName -CI:($null -ne $env:SYSTEM_TEAMPROJECTID)
-        } else {
-          Write-Host ($rg | Remove-AzResourceGroup -Force -AsJob).Name
         }
+
+        Write-Host ($rg | Remove-AzResourceGroup -Force -AsJob).Name
       }
     } catch {
       Write-Warning "Failure deleting/purging group $($rg.ResourceGroupName):"
@@ -449,7 +477,7 @@ function DeleteAndPurgeGroups([array]$toDelete) {
   }
 
   if (!$purgeableResources.Count) {
-    return
+    return $hasError
   }
   if ($Force -or $PSCmdlet.ShouldProcess("Purgable Resources", "Delete Purgeable Resources")) {
     # Purge all the purgeable resources and get a list of resources (as a collection) we need to follow-up on.
@@ -505,6 +533,7 @@ if ($SubscriptionId -and ($originalSubscription -ne $SubscriptionId)) {
 
 try {
   DeleteOrUpdateResourceGroups
+  DeleteSubscriptionDeployments
 } finally {
   if ($SubscriptionId -and ($originalSubscription -ne $SubscriptionId)) {
     Select-AzSubscription -Subscription $originalSubscription -Confirm:$false -WhatIf:$false
