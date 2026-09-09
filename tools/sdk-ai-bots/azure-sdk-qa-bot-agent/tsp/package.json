@@ -9,10 +9,10 @@
     "format": "tsp format **/*.tsp"
   },
   "devDependencies": {
-    "@typespec/compiler": "^0.66.0",
+    "@typespec/compiler": "^1.16.0",
     "@typespec/http": "^0.66.0",
     "@typespec/rest": "^0.66.0",
-    "@typespec/openapi3": "^0.66.0",
+    "@typespec/openapi3": "^1.16.0",
     "@typespec/openapi": "^0.66.0",
     "@typespec/versioning": "^0.66.0"
   }
