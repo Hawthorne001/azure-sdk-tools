@@ -19,7 +19,7 @@
   "devDependencies": {
     "@azure-rest/core-client": "^2.3.1",
     "@typespec/http-specs": "0.1.0-alpha.29-dev.2",
-    "@typespec/spector": "0.1.0-alpha.21-dev.1",
+    "@typespec/spector": "0.1.0-alpha.27-dev.1",
     "@typespec/spec-api": "0.1.0-alpha.11-dev.0",
     "@typespec/tspd": "0.73.1",
     "@azure-tools/azure-http-specs": "0.1.0-alpha.33-dev.0",
@@ -41,7 +41,7 @@
     "@types/node": "^18.0.0",
     "@typescript-eslint/eslint-plugin": "^8.28.0",
     "@typescript-eslint/parser": "^8.28.0",
-    "@typespec/compiler": "1.6.0",
+    "@typespec/compiler": "1.16.0",
     "@typespec/http": "1.6.0",
     "@typespec/openapi": "1.6.0",
     "@typespec/rest": "0.76.0",
@@ -59,13 +59,13 @@
     "rimraf": "^5.0.0",
     "ts-node": "~10.9.1",
     "typescript": "~5.8.2",
-    "vitest": "~4.1.0",
+    "vitest": "~5.0.0",
     "@vitest/coverage-v8": "~4.1.0",
     "@vitest/coverage-istanbul": "~4.1.0",
     "@microsoft/api-extractor": "^7.47.5",
     "tsx": "^4.16.5",
     "@types/js-yaml": "^4.0.9",
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^5.4.1"
   },
   "peerDependencies": {
     "@azure-tools/typespec-azure-core": "^0.62.0",

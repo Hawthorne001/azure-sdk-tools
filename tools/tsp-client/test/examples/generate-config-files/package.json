@@ -10,8 +10,8 @@
     "@azure-tools/typespec-autorest": "0.53.0",
     "@azure-tools/typespec-azure-core": "0.53.0",
     "@azure-tools/typespec-client-generator-core": "0.53.0",
-    "@typespec/compiler": "~0.67.0",
-    "vitest": "4.1.0"
+    "@typespec/compiler": "~1.16.0",
+    "vitest": "5.0.0"
   },
   "peerDependencies": {
     "@typespec/compiler": ">=0.66.0 <1.0.0"

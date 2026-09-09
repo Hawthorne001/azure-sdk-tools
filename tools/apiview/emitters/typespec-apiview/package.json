@@ -77,6 +77,6 @@
     "rimraf": "~5.0.7",
     "source-map-support": "^0.5.19",
     "typescript": "~5.4.5",
-    "vitest": "^4.1.8"
+    "vitest": "^5.0.0"
   }
 }
